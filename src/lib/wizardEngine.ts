@@ -15,6 +15,7 @@ export type Step = {
   id: string;
   title: string;
   helper?: string;
+  tooltip?: string;
   options: Option[];
 };
 
@@ -22,6 +23,7 @@ export type StepDefinition = {
   id: string;
   title: string;
   helper?: string;
+  tooltip?: string;
   options: (state: WizardState) => Option[];
   isActive?: (state: WizardState) => boolean;
 };
@@ -45,6 +47,7 @@ export function getSteps(state: WizardState): Step[] {
       id: step.id,
       title: step.title,
       helper: step.helper,
+      tooltip: step.tooltip,
       options: step.options(state),
     }));
 }

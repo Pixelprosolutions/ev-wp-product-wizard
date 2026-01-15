@@ -38,7 +38,7 @@ const powerTriOptions: Option[] = [
 ];
 
 const smartOptions: Option[] = [
-  { id: "smart-yes", label: "Ναι (Smart)", value: { pa_smart: "yes" } },
+  { id: "smart-yes", label: "Ναι", value: { pa_smart: "yes" } },
   { id: "smart-no", label: "Όχι", value: { pa_smart: "no" } },
 ];
 
@@ -60,13 +60,32 @@ const cableOptions: Option[] = [
   },
 ];
 
-const ENABLE_DC_MODE = false;
+const privateChargingModeOptions: Option[] = [
+  { id: "mode-2", label: "Mode 2", value: { charging_mode: "mode-2" } },
+  { id: "mode-3", label: "Mode 3", value: { charging_mode: "mode-3-ac" } },
+];
 
-const chargingModeOptions: Option[] = [
-  { id: "mode-3-ac", label: "Mode 3 (AC)", value: { pa_charging_mode: "mode-3-ac" } },
-  ...(ENABLE_DC_MODE
-    ? [{ id: "mode-4-dc", label: "Mode 4 (DC)", value: { pa_charging_mode: "mode-4-dc" } }]
-    : []),
+const publicChargingModeOptions: Option[] = [
+  { id: "mode-3-ac", label: "Mode 3 AC", value: { charging_mode: "mode-3-ac" } },
+  { id: "mode-4-dc", label: "Mode 4 DC", value: { charging_mode: "mode-4-dc" } },
+];
+
+const mountingOptions: Option[] = [
+  {
+    id: "mounting-wall",
+    label: "Επίτοιχη",
+    value: { pa_mounting: ["epitoichi"] },
+  },
+  {
+    id: "mounting-floor",
+    label: "Επιδαπέδια",
+    value: { pa_mounting: ["epidapedio"] },
+  },
+  {
+    id: "mounting-undecided",
+    label: "Δεν έχω αποφασίσει",
+    value: {},
+  },
 ];
 
 const getUseCaseValues = (state: WizardState): string[] => {
@@ -80,12 +99,37 @@ const getUseCaseValues = (state: WizardState): string[] => {
 export const stepDefinitions: StepDefinition[] = [
   {
     id: "use_case",
-    title: "Πού θα χρησιμοποιηθεί ο φορτιστής;",
+    title: "Είναι για ιδιωτική ή δημόσια φόρτιση?",
+    tooltip:
+      "Δημόσια φόρτιση\nΣημείο φόρτισης προσβάσιμο στο κοινό, συνήθως σε πάρκινγκ, βενζινάδικα, εμπορικά κέντρα ή αυτοκινητόδρομους.\n\nΙδιωτική φόρτιση\nΣημείο φόρτισης για προσωπική ή επαγγελματική χρήση, όπως σε κατοικίες ή χώρους επιχειρήσεων.",
     options: () => useCaseOptions,
   },
   {
+    id: "charging_mode",
+    title: "Τι Mode θέλεις να είναι ο φορτιστής;",
+    tooltip:
+      "Mode 2\nΦόρτιση από απλή πρίζα με φορητό καλώδιο/κουτί ελέγχου. Πιο αργή.\n\nMode 3\nΦόρτιση από σταθερό wallbox AC. Η πιο συνηθισμένη για σπίτι/επιχείρηση.\n\nMode 4\nΤαχυφόρτιση DC (rapid). Συνήθως για δημόσια σημεία.",
+    options: (state) => {
+      const useCases = getUseCaseValues(state);
+      if (useCases.includes("oikiaki")) {
+        return privateChargingModeOptions;
+      }
+      if (useCases.includes("dimosia") || useCases.includes("epaggelmatiki")) {
+        return publicChargingModeOptions;
+      }
+      return privateChargingModeOptions;
+    },
+  },
+  {
+    id: "mounting",
+    title: "Τι τοποθέτηση επιθυμείς;",
+    options: () => mountingOptions,
+  },
+  {
     id: "phase",
-    title: "Τι παροχή διαθέτετε;",
+    title: "Τι τύπο παροχής έχεις?",
+    tooltip:
+      "Η παροχή ρεύματος αναγράφεται στον λογαριασμό του ρεύματος.\n\nΜονοφασική παροχή\nΣυνήθως σε κατοικίες και μικρές εγκαταστάσεις.\n\nΤριφασική παροχή\nΣυνήθως σε επιχειρήσεις ή εγκαταστάσεις με αυξημένες ανάγκες ισχύος.",
     options: () => phaseOptions,
   },
   {
@@ -98,11 +142,13 @@ export const stepDefinitions: StepDefinition[] = [
   {
     id: "smart",
     title: "Θέλετε smart λειτουργίες;",
+    tooltip:
+      "Smart λειτουργίες σημαίνουν ότι ο φορτιστής μπορεί:\nνα συνδέεται με εφαρμογή στο κινητό\nνα ελέγχεται και να παρακολουθείται απομακρυσμένα\nνα προγραμματίζει ώρες φόρτισης\nνα εμφανίζει στατιστικά κατανάλωσης\n\n💡 Ιδανικό αν θέλετε έλεγχο, ευελιξία και καλύτερη διαχείριση ενέργειας.",
     options: () => smartOptions,
   },
   {
     id: "connectors",
-    title: "Πόσες παροχές φόρτισης (συνδέσεις) χρειάζεστε;",
+    title: "Πόσες εξόδους θέλεις να έχει ο φορτιστής?",
     options: () => connectorOptions,
     isActive: (state) => {
       const useCases = getUseCaseValues(state);
@@ -113,14 +159,5 @@ export const stepDefinitions: StepDefinition[] = [
     id: "cable",
     title: "Με καλώδιο ή χωρίς;",
     options: () => cableOptions,
-  },
-  {
-    id: "charging_mode",
-    title: "Τι τύπο φόρτισης χρειάζεστε;",
-    options: () => chargingModeOptions,
-    isActive: (state) => {
-      const useCases = getUseCaseValues(state);
-      return useCases.includes("dimosia") || useCases.includes("epaggelmatiki");
-    },
   },
 ];

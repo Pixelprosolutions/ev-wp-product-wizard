@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
 
 :root {
   color-scheme: light;
@@ -31,7 +31,7 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Sora", "Manrope", sans-serif;
+  font-family: "Manrope", "Helvetica Neue", sans-serif;
   font-weight: 400;
   margin: 0 0 0.5rem;
 }
@@ -71,6 +71,13 @@ button {
   width: auto;
   max-width: 360px;
   object-fit: contain;
+}
+
+.app__subtitle {
+  text-align: center;
+  font-size: 22px;
+  color: var(--muted);
+  margin: -6px 0 6px;
 }
 
 .shell,
@@ -115,11 +122,26 @@ button {
   cursor: pointer;
   padding: 6px 4px;
   transition: opacity 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .link-button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+.link-button--icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+.link-button__icon {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 .progress {
@@ -150,9 +172,86 @@ button {
   margin: 0;
 }
 
+.shell__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .shell__helper {
   font-size: 0.95rem;
   margin-top: 8px;
+}
+
+.tooltip {
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tooltip__icon {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tooltip__content {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  transform: translateX(-50%) translateY(-6px);
+  width: min(320px, 80vw);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--text);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+.tooltip:hover .tooltip__content,
+.tooltip:focus-visible .tooltip__content {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.tooltip__section {
+  display: block;
+}
+
+.tooltip__section + .tooltip__section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.tooltip__heading {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.tooltip__text {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 .shell__content {
@@ -206,6 +305,86 @@ button {
   margin-top: auto;
   font-weight: 600;
   color: var(--accent-strong);
+}
+
+.lead-card {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: grid;
+  gap: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.lead-card__title {
+  margin: 0;
+}
+
+.lead-form {
+  display: grid;
+  gap: 18px;
+}
+
+.lead-form__row {
+  display: grid;
+  gap: 8px;
+}
+
+.lead-form__label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lead-form__input,
+.lead-form__select {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #d7e5df;
+  background: var(--accent-soft);
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.lead-form__input:focus,
+.lead-form__select:focus {
+  outline: none;
+  border-color: rgba(15, 107, 92, 0.4);
+  box-shadow: 0 0 0 3px rgba(15, 107, 92, 0.12);
+}
+
+.lead-form__consent {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.lead-form__consent input {
+  margin-top: 4px;
+}
+
+.lead-form__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.lead-form__actions .primary-button {
+  width: 100%;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 1rem;
+}
+
+.lead-form__actions .primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .results__layout {
@@ -338,6 +517,22 @@ button {
 .status {
   text-align: center;
   padding: 40px 20px 20px;
+}
+
+.status--empty {
+  text-align: left;
+  padding: 28px 0 0;
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+}
+
+.status--empty .primary-button {
+  width: 100%;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 1rem;
 }
 
 .status--error h2 {

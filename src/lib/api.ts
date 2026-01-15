@@ -32,8 +32,28 @@ export type RecommendationRequest = {
   fallback: boolean;
 };
 
-const ENDPOINT =
-  "https://voltbuild.gr/wp-json/voltbuild/v1/recommendations";
+export type LeadPayload = {
+  fullName: string;
+  email: string;
+  phone?: string;
+  role: string;
+  otherRole?: string;
+  consent: boolean;
+  answers?: Record<string, string | string[]>;
+  request_id?: string;
+  page_url?: string;
+  user_agent?: string;
+};
+
+export type LeadResponse = {
+  ok: boolean;
+  lead_id?: number;
+  message?: string;
+};
+
+const API_BASE = "https://voltbuild.gr/wp-json/voltbuild/v1";
+const ENDPOINT = `${API_BASE}/recommendations`;
+const LEADS_ENDPOINT = `${API_BASE}/leads`;
 
 export function buildRecommendationPayload(
   answers: Record<string, string | string[]>,
@@ -41,6 +61,9 @@ export function buildRecommendationPayload(
 ): RecommendationRequest {
   const filters: Record<string, string[]> = {};
   for (const [taxonomy, value] of Object.entries(answers)) {
+    if (taxonomy === "charging_mode") {
+      continue;
+    }
     filters[taxonomy] = Array.isArray(value) ? value : [value];
   }
   return {
@@ -71,5 +94,28 @@ export async function fetchRecommendations(
   }
 
   const data = (await response.json()) as RecommendationResponse;
+  return data;
+}
+
+export async function postLead(
+  payload: LeadPayload,
+  signal?: AbortSignal
+): Promise<LeadResponse> {
+  const response = await fetch(LEADS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  const data = (await response.json()) as LeadResponse;
+
+  if (!response.ok) {
+    const message = data?.message || "Lead request failed";
+    throw new Error(message);
+  }
+
   return data;
 }
