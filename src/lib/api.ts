@@ -32,16 +32,32 @@ export type RecommendationRequest = {
   fallback: boolean;
 };
 
+export type LeadAnswer = {
+  value: string | string[];
+  label: string;
+};
+
+export type LeadResult = {
+  id: number;
+  name: string;
+  url?: string;
+};
+
 export type LeadPayload = {
+  lead_id?: number;
   fullName: string;
   email: string;
   phone?: string;
   role: string;
   otherRole?: string;
   consent: boolean;
-  answers?: Record<string, string | string[]>;
+  answers?: Record<string, LeadAnswer>;
+  filters?: RecommendationRequest;
+  results?: LeadResult[];
   request_id?: string;
   page_url?: string;
+  referrer?: string;
+  utm?: Record<string, string>;
   user_agent?: string;
 };
 

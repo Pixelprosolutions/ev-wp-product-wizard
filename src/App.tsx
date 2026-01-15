@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -18,13 +19,19 @@ import {
   goBack,
   initialState,
   resetWizard,
+  type AnswerMap,
+  type AnswerValue,
   type Option,
+  type Step,
   type WizardState,
 } from "./lib/wizardEngine";
 import {
   buildRecommendationPayload,
   fetchRecommendations,
   postLead,
+  type LeadAnswer,
+  type LeadResult,
+  type RecommendationProduct,
   type RecommendationResponse,
 } from "./lib/api";
 
@@ -58,6 +65,92 @@ function createRequestId() {
   return `wizard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeAnswerValue(value: AnswerValue): string[] {
+  const list = Array.isArray(value) ? value : [value];
+  return list.map((item) => String(item)).sort();
+}
+
+function formatAnswerLabel(value: AnswerValue): string {
+  return Array.isArray(value) ? value.join(", ") : String(value);
+}
+
+function isAnswerMatch(
+  answerValue: AnswerValue | undefined,
+  optionValue: AnswerValue
+): boolean {
+  if (!answerValue) {
+    return false;
+  }
+  const normalizedAnswer = normalizeAnswerValue(answerValue);
+  const normalizedOption = normalizeAnswerValue(optionValue);
+  if (normalizedAnswer.length !== normalizedOption.length) {
+    return false;
+  }
+  return normalizedAnswer.every(
+    (item, index) => item === normalizedOption[index]
+  );
+}
+
+function buildLeadAnswers(answers: AnswerMap, steps: Step[]): Record<string, LeadAnswer> {
+  const labelsByKey: Record<string, string> = {};
+
+  for (const step of steps) {
+    for (const option of step.options) {
+      for (const [key, optionValue] of Object.entries(option.value)) {
+        if (isAnswerMatch(answers[key], optionValue)) {
+          labelsByKey[key] = option.label;
+        }
+      }
+    }
+  }
+
+  const leadAnswers: Record<string, LeadAnswer> = {};
+  for (const [key, value] of Object.entries(answers)) {
+    leadAnswers[key] = {
+      value,
+      label: labelsByKey[key] ?? formatAnswerLabel(value),
+    };
+  }
+
+  return leadAnswers;
+}
+
+function buildLeadResults(products: RecommendationProduct[]): LeadResult[] {
+  return products.map((product) => ({
+    id: product.id,
+    name: product.name,
+    url: product.permalink ? product.permalink : undefined,
+  }));
+}
+
+function readUtmParams(): Record<string, string> | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const utm: Record<string, string> = {};
+  for (const [key, value] of params.entries()) {
+    if (!key.startsWith("utm_")) {
+      continue;
+    }
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      continue;
+    }
+    utm[key] = trimmedValue;
+  }
+  return Object.keys(utm).length ? utm : undefined;
+}
+
+function getPageContext() {
+  return {
+    page_url: typeof window !== "undefined" ? window.location.href : "",
+    referrer: typeof document !== "undefined" ? document.referrer : "",
+    utm: readUtmParams(),
+    user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+  };
+}
+
 export default function App() {
   const [state, setState] = useState<WizardState>(initialState);
   const [results, setResults] = useState<ResultsStatus>({ status: "idle" });
@@ -67,8 +160,13 @@ export default function App() {
   );
   const [leadSubmitted, setLeadSubmitted] = useState(false);
   const [leadRequestId, setLeadRequestId] = useState<string | null>(null);
+  const [leadId, setLeadId] = useState<number | null>(null);
   const [leadSubmitting, setLeadSubmitting] = useState(false);
   const [leadError, setLeadError] = useState<string | null>(null);
+  const leadResultsSyncRef = useRef<{ leadId: number | null; resultsKey: string | null }>({
+    leadId: null,
+    resultsKey: null,
+  });
 
   const steps = useMemo(() => getSteps(state), [state]);
   const stepIds = useMemo(() => steps.map((step) => step.id), [steps]);
@@ -132,6 +230,59 @@ export default function App() {
     return () => controller.abort();
   }, [isResults, leadSubmitted, leadRequestId, state.answers, retryToken]);
 
+  useEffect(() => {
+    if (!leadSubmitted || !leadId) {
+      return;
+    }
+    if (results.status !== "success") {
+      return;
+    }
+    if (!leadRequestId) {
+      return;
+    }
+
+    const leadResults = buildLeadResults(results.data.products);
+    const resultsKey = JSON.stringify(leadResults);
+    const lastSync = leadResultsSyncRef.current;
+    if (lastSync.leadId === leadId && lastSync.resultsKey === resultsKey) {
+      return;
+    }
+
+    const answersPayload = buildLeadAnswers(state.answers, steps);
+    const filtersPayload = buildRecommendationPayload(state.answers, leadRequestId);
+    const pageContext = getPageContext();
+
+    postLead({
+      lead_id: leadId,
+      fullName: leadData.fullName.trim(),
+      email: leadData.email.trim(),
+      phone: leadData.phone.trim(),
+      role: leadData.role,
+      otherRole: leadData.otherRole.trim(),
+      consent: leadData.consent,
+      answers: answersPayload,
+      filters: filtersPayload,
+      results: leadResults,
+      request_id: leadRequestId,
+      page_url: pageContext.page_url,
+      referrer: pageContext.referrer || undefined,
+      utm: pageContext.utm,
+      user_agent: pageContext.user_agent,
+    })
+      .then(() => {
+        leadResultsSyncRef.current = { leadId, resultsKey };
+      })
+      .catch(() => {});
+  }, [
+    leadData,
+    leadId,
+    leadRequestId,
+    leadSubmitted,
+    results,
+    state.answers,
+    steps,
+  ]);
+
   const handleSelect = useCallback((option: Option) => {
     setState((prev) => applyAnswer(prev, option));
   }, []);
@@ -146,14 +297,17 @@ export default function App() {
     setLeadData(createInitialLeadData());
     setLeadSubmitted(false);
     setLeadRequestId(null);
+    setLeadId(null);
     setLeadSubmitting(false);
     setLeadError(null);
+    leadResultsSyncRef.current = { leadId: null, resultsKey: null };
   }, []);
 
   const handleRetry = useCallback(() => {
     setResults({ status: "loading" });
     setRetryToken((value) => value + 1);
-  }, []);
+    leadResultsSyncRef.current = { leadId, resultsKey: null };
+  }, [leadId]);
 
   const handleLeadChange = useCallback(
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -187,20 +341,28 @@ export default function App() {
       const requestId = leadRequestId ?? createRequestId();
       setLeadRequestId(requestId);
       setLeadSubmitting(true);
+      leadResultsSyncRef.current = { leadId: null, resultsKey: null };
+      const answersPayload = buildLeadAnswers(state.answers, steps);
+      const filtersPayload = buildRecommendationPayload(state.answers, requestId);
+      const pageContext = getPageContext();
 
       try {
-        await postLead({
+        const response = await postLead({
           fullName: leadData.fullName.trim(),
           email: leadData.email.trim(),
           phone: leadData.phone.trim(),
           role: leadData.role,
           otherRole: leadData.otherRole.trim(),
           consent: leadData.consent,
-          answers: state.answers,
+          answers: answersPayload,
+          filters: filtersPayload,
           request_id: requestId,
-          page_url: typeof window !== "undefined" ? window.location.href : "",
-          user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+          page_url: pageContext.page_url,
+          referrer: pageContext.referrer || undefined,
+          utm: pageContext.utm,
+          user_agent: pageContext.user_agent,
         });
+        setLeadId(response.lead_id ?? null);
         setLeadSubmitted(true);
       } catch (error) {
         const message =
@@ -209,11 +371,12 @@ export default function App() {
             : "Δεν ήταν δυνατή η αποθήκευση των στοιχείων.";
         setLeadError(message);
         setLeadSubmitted(false);
+        setLeadId(null);
       } finally {
         setLeadSubmitting(false);
       }
     },
-    [leadData, leadRequestId, leadSubmitting, state.answers]
+    [leadData, leadRequestId, leadSubmitting, state.answers, steps]
   );
 
   return (
